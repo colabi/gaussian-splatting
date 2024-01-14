@@ -14,7 +14,7 @@ import sys
 from PIL import Image
 from typing import NamedTuple
 from scene.colmap_loader import read_extrinsics_text, read_intrinsics_text, qvec2rotmat, rot2rotmat, \
-    read_extrinsics_binary, read_intrinsics_binary, read_points3D_binary, read_points3D_text
+    read_extrinsics_binary, read_intrinsics_binary, read_points3D_binary, read_points3D_text, read_points_myxed
 from utils.graphics_utils import getWorld2View2, focal2fov, fov2focal
 import numpy as np
 import json
@@ -22,6 +22,8 @@ from pathlib import Path
 from plyfile import PlyData, PlyElement
 from utils.sh_utils import SH2RGB
 from scene.gaussian_model import BasicPointCloud
+
+KDEG2RAD = 57.2958279088
 
 class CameraInfo(NamedTuple):
     uid: int
@@ -106,11 +108,14 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
     return cam_infos
 
 def fetchPly(path):
+    print("PRE READ", path)
     plydata = PlyData.read(path)
+    print("DATA READ")
     vertices = plydata['vertex']
     positions = np.vstack([vertices['x'], vertices['y'], vertices['z']]).T
     colors = np.vstack([vertices['red'], vertices['green'], vertices['blue']]).T / 255.0
-    normals = np.vstack([vertices['nx'], vertices['ny'], vertices['nz']]).T
+    print(len(colors))
+    # normals = np.vstack([vertices['nx'], vertices['ny'], vertices['nz']]).T
     return BasicPointCloud(points=positions, colors=colors, normals=normals)
 
 def storePly(path, xyz, rgb):
@@ -245,8 +250,7 @@ def readMyxedCameras(camera_data, images_folder):
             R = np.transpose(rot2rotmat(rot))
             T = np.array(pos)
 
-            C = 57.2958279088
-            FovY = camera[7]["FOVY"]/C
+            FovY = camera[7]["FOVY"]/KDEG2RAD
             FovX = float(width)/float(height)*FovY
 
             image_path = os.path.join(images_folder, os.path.basename(uid))
@@ -285,11 +289,18 @@ def readMyxedInfo(path, images, eval, llffhold=8):
     nerf_normalization = getNerfppNorm(train_cam_infos)
 
     ply_path = os.path.join(path, pointfilename)
+    # ply_path = os.path.join(path, pointfilename.replace("bin","ply"))
+    # ply_path = "/tmp/points.ply"
+    print("BIN:", ply_path)
     try:
-        pcd = fetchPly(ply_path)
-    except:
+        xyz, rgb, _ = read_points_myxed(ply_path)
+        # storePly(ply_path, xyz, rgb)
+        # pcd = fetchPly(ply_path)
+        pcd = BasicPointCloud(points=xyz, colors=rgb, normals=None)
+    except Exception as e:
+        print("ERROR", e)
         pcd = None
-
+    print("lengths: ", len(pcd.points))
 
     scene_info = SceneInfo(point_cloud=pcd,
                            train_cameras=train_cam_infos,

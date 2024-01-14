@@ -12,6 +12,7 @@
 import numpy as np
 import collections
 import struct
+from plyfile import PlyData
 
 CameraModel = collections.namedtuple(
     "CameraModel", ["model_id", "model_name", "num_params"])
@@ -127,6 +128,27 @@ def read_points3D_text(path):
                 count += 1
 
     return xyzs, rgbs, errors
+
+def read_points_myxed(path_to_model_file):
+    p = PlyData.read(path_to_model_file)
+    num_points = len(p['vertex'])
+    # xyzs = np.empty((num_points, 3))
+    # rgbs = np.empty((num_points, 3))
+    vertices = p['vertex']
+    # xyzs[0::3] = p['vertex']['x']
+    # xyzs[1::3] = p['vertex']['y']
+    # xyzs[2::3] = p['vertex']['z']
+    # xyzs = xyzs.reshape((num_points, 3))
+
+    # rgbs[0::3] = p['vertex']['red']
+    # rgbs[1::3] = p['vertex']['green']
+    # rgbs[2::3] = p['vertex']['blue']
+    # rgbs = rgbs.reshape((num_points, 3))
+    positions = np.vstack([vertices['x'], vertices['y'], vertices['z']]).T
+    colors = np.vstack([vertices['red'], vertices['green'], vertices['blue']]).T / 255.0
+    print("read_points_myxed: ", positions)
+    return positions, colors, None
+
 
 def read_points3D_binary(path_to_model_file):
     """
