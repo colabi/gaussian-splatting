@@ -220,7 +220,6 @@ def readCamerasFromTransforms(path, transformsfile, white_background, extension=
             
     return cam_infos
 
-
 def readMyxedCameras(camera_data, images_folder):
     cam_infos = []
     # cam_intrinsics = camera_data["intrinsics"]
