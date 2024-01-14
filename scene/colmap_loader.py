@@ -41,7 +41,9 @@ CAMERA_MODEL_NAMES = dict([(camera_model.model_name, camera_model)
 
 def rot2rotmat(rot):
     return np.array([
-        
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1]
     ])
 
 def qvec2rotmat(qvec):
