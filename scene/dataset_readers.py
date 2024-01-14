@@ -13,7 +13,7 @@ import os
 import sys
 from PIL import Image
 from typing import NamedTuple
-from scene.colmap_loader import read_extrinsics_text, read_intrinsics_text, qvec2rotmat, \
+from scene.colmap_loader import read_extrinsics_text, read_intrinsics_text, qvec2rotmat, rot2rotmat, \
     read_extrinsics_binary, read_intrinsics_binary, read_points3D_binary, read_points3D_text
 from utils.graphics_utils import getWorld2View2, focal2fov, fov2focal
 import numpy as np
@@ -230,7 +230,7 @@ def readMyxedCameras(camera_data, images_folder):
     idx = 0
     for camera in cameras:
     # for idx, key in enumerate(cam_extrinsics):
-        if idx % skip == 0 and idx < 10000:
+        if idx % skip == 0 and idx < 1000:
             sys.stdout.write('\r')
             # the exact output you're looking for:
             sys.stdout.write("Reading camera {}/{}".format(idx+1, len(cameras)))
@@ -242,7 +242,7 @@ def readMyxedCameras(camera_data, images_folder):
             uid = camera[0]
             pos = [camera[1], camera[2], camera[3]]
             rot = [camera[4], camera[5], camera[6]]
-            R = np.transpose(qvec2rotmat(extr.qvec))
+            R = np.transpose(rot2rotmat(rot))
             T = np.array(pos)
 
             C = 57.2958279088
