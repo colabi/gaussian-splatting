@@ -220,17 +220,18 @@ def readCamerasFromTransforms(path, transformsfile, white_background, extension=
             
     return cam_infos
 
+
 def readMyxedCameras(camera_data, images_folder):
     cam_infos = []
-    cam_intrinsics = camera_data["intrinsics"]
-    cam_extrinsics = camera_data["extrinsics"]
+    # cam_intrinsics = camera_data["intrinsics"]
+    # cam_extrinsics = camera_data["extrinsics"]
     cameras = camera_data["cameras"]
     process = camera_data["processing"]
     skip = process["skip"]
     idx = 0
     for camera in cameras:
     # for idx, key in enumerate(cam_extrinsics):
-        if idx % skip == 0:
+        if idx % skip == 0 and idx < 10000:
             sys.stdout.write('\r')
             # the exact output you're looking for:
             sys.stdout.write("Reading camera {}/{}".format(idx+1, len(cameras)))
@@ -245,7 +246,8 @@ def readMyxedCameras(camera_data, images_folder):
             R = np.transpose(qvec2rotmat(extr.qvec))
             T = np.array(pos)
 
-            FovY = camera[7]["FOVY"]
+            C = 57.2958279088
+            FovY = camera[7]["FOVY"]/C
             FovX = float(width)/float(height)*FovY
 
             image_path = os.path.join(images_folder, os.path.basename(uid))
