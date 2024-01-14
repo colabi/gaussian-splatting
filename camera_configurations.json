@@ -1,0 +1,8 @@
+{
+    "iphone14_ultrawide": {
+        "FOVY": 90.0
+    },
+    "iphone14_fisheye": {
+        "FOVY": 180.0
+    }
+}

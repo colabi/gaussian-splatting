@@ -65,6 +65,7 @@ def getNerfppNorm(cam_info):
 
     return {"translate": translate, "radius": radius}
 
+
 def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
     cam_infos = []
     for idx, key in enumerate(cam_extrinsics):
@@ -176,6 +177,7 @@ def readColmapSceneInfo(path, images, eval, llffhold=8):
                            ply_path=ply_path)
     return scene_info
 
+
 def readCamerasFromTransforms(path, transformsfile, white_background, extension=".png"):
     cam_infos = []
 
@@ -218,6 +220,79 @@ def readCamerasFromTransforms(path, transformsfile, white_background, extension=
             
     return cam_infos
 
+def readMyxedCameras(camera_data, images_folder):
+    cam_infos = []
+    cam_intrinsics = camera_data["intrinsics"]
+    cam_extrinsics = camera_data["extrinsics"]
+    cameras = camera_data["cameras"]
+    process = camera_data["processing"]
+    skip = process["skip"]
+    idx = 0
+    for camera in cameras:
+    # for idx, key in enumerate(cam_extrinsics):
+        if idx % skip == 0:
+            sys.stdout.write('\r')
+            # the exact output you're looking for:
+            sys.stdout.write("Reading camera {}/{}".format(idx+1, len(cameras)))
+            sys.stdout.flush()
+
+            height = camera[8]
+            width = camera[9]
+
+            uid = camera[0]
+            pos = [camera[1], camera[2], camera[3]]
+            rot = [camera[4], camera[5], camera[6]]
+            R = np.transpose(qvec2rotmat(extr.qvec))
+            T = np.array(pos)
+
+            FovY = camera[7]["FOVY"]
+            FovX = float(width)/float(height)*FovY
+
+            image_path = os.path.join(images_folder, os.path.basename(uid))
+            image_name = os.path.basename(image_path).split(".")[0]
+            image = Image.open(image_path)
+
+            cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
+                                image_path=image_path, image_name=image_name, width=width, height=height)
+            cam_infos.append(cam_info)
+        idx += 1
+    sys.stdout.write('\n')
+    return cam_infos
+
+def readMyxedInfo(path, images, eval, llffhold=8):
+    cam_infos = []
+    ply_path = os.path.join(path, "points3d.ply")
+    try:
+        pcd = fetchPly(ply_path)
+    except:
+        pcd = None
+        
+    #cameras
+    cameras_file = os.path.join(path, "out.myxed")
+    camera_data = None
+    with open(cameras_file, "r") as cfile:
+        camera_data = json.loads(cfile.read())
+
+    reading_dir = "undistorted_images" if images == None else images
+    cam_infos_unsorted = readMyxedCameras(camera_data=camera_data, images_folder=os.path.join(path, reading_dir))
+    cam_infos = sorted(cam_infos_unsorted.copy(), key = lambda x : x.image_name)
+
+    if eval:
+        train_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold != 0]
+        test_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % llffhold == 0]
+    else:
+        train_cam_infos = cam_infos
+        test_cam_infos = []
+
+    nerf_normalization = getNerfppNorm(train_cam_infos)
+
+    scene_info = SceneInfo(point_cloud=pcd,
+                           train_cameras=train_cam_infos,
+                           test_cameras=test_cam_infos,
+                           nerf_normalization=nerf_normalization,
+                           ply_path=ply_path)
+    return scene_info
+
 def readNerfSyntheticInfo(path, white_background, eval, extension=".png"):
     print("Reading Training Transforms")
     train_cam_infos = readCamerasFromTransforms(path, "transforms_train.json", white_background, extension)
@@ -256,5 +331,6 @@ def readNerfSyntheticInfo(path, white_background, eval, extension=".png"):
 
 sceneLoadTypeCallbacks = {
     "Colmap": readColmapSceneInfo,
-    "Blender" : readNerfSyntheticInfo
+    "Blender" : readNerfSyntheticInfo,
+    "Myxed" : readMyxedInfo
 }
