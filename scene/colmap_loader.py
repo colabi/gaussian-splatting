@@ -13,6 +13,7 @@ import numpy as np
 import collections
 import struct
 from plyfile import PlyData
+from  scipy.spatial.transform import Rotation as R
 
 CameraModel = collections.namedtuple(
     "CameraModel", ["model_id", "model_name", "num_params"])
@@ -41,11 +42,13 @@ CAMERA_MODEL_NAMES = dict([(camera_model.model_name, camera_model)
                            for camera_model in CAMERA_MODELS])
 
 def rot2rotmat(rot):
-    return np.array([
-        [1, 0, 0],
-        [0, 1, 0],
-        [0, 0, 1]
-    ])
+    # return np.array([
+    #     [1, 0, 0],
+    #     [0, 1, 0],
+    #     [0, 0, 1]
+    # ])
+    r = R.from_euler('zyx', rot, degrees=True)
+    return r.as_matrix()
 
 def qvec2rotmat(qvec):
     return np.array([
@@ -129,7 +132,7 @@ def read_points3D_text(path):
 
     return xyzs, rgbs, errors
 
-def read_points_myxed(path_to_model_file):
+def read_points_myxed(path_to_model_file, step=1):
     p = PlyData.read(path_to_model_file)
     num_points = len(p['vertex'])
     # xyzs = np.empty((num_points, 3))
@@ -146,7 +149,10 @@ def read_points_myxed(path_to_model_file):
     # rgbs = rgbs.reshape((num_points, 3))
     positions = np.vstack([vertices['x'], vertices['y'], vertices['z']]).T
     colors = np.vstack([vertices['red'], vertices['green'], vertices['blue']]).T / 255.0
-    print("read_points_myxed: ", positions)
+    if step > 1:
+        positions = positions[0::step]
+        colors = colors[0::step]
+    print("read_points_myxed: ", positions.shape)
     return positions, colors, None
 
 

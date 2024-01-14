@@ -267,16 +267,20 @@ def readMyxedCameras(camera_data, images_folder):
 def readMyxedInfo(path, images, eval, llffhold=8):
     cam_infos = []
         
+    myxedfilename = os.path.basename(path)
+    basepath = path.replace(myxedfilename,"")
+    print("files: ", basepath,myxedfilename)
+
     #cameras
-    cameras_file = os.path.join(path, "out.myxed")
     camera_data = None
-    with open(cameras_file, "r") as cfile:
+    with open(path, "r") as cfile:
         camera_data = json.loads(cfile.read())
 
     pointfilename = camera_data["processing"]["points"]
+    pointstep = camera_data["processing"]["pointstep"]
     print(pointfilename)
     reading_dir = camera_data["processing"]["images"]
-    cam_infos_unsorted = readMyxedCameras(camera_data=camera_data, images_folder=os.path.join(path, reading_dir))
+    cam_infos_unsorted = readMyxedCameras(camera_data=camera_data, images_folder=os.path.join(basepath, reading_dir))
     cam_infos = sorted(cam_infos_unsorted.copy(), key = lambda x : x.image_name)
 
     if eval:
@@ -288,14 +292,10 @@ def readMyxedInfo(path, images, eval, llffhold=8):
 
     nerf_normalization = getNerfppNorm(train_cam_infos)
 
-    ply_path = os.path.join(path, pointfilename)
-    # ply_path = os.path.join(path, pointfilename.replace("bin","ply"))
-    # ply_path = "/tmp/points.ply"
+    ply_path = os.path.join(basepath, pointfilename)
     print("BIN:", ply_path)
     try:
-        xyz, rgb, _ = read_points_myxed(ply_path)
-        # storePly(ply_path, xyz, rgb)
-        # pcd = fetchPly(ply_path)
+        xyz, rgb, _ = read_points_myxed(ply_path, step=pointstep)
         pcd = BasicPointCloud(points=xyz, colors=rgb, normals=None)
     except Exception as e:
         print("ERROR", e)
