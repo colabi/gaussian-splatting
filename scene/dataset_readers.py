@@ -262,11 +262,6 @@ def readMyxedCameras(camera_data, images_folder):
 
 def readMyxedInfo(path, images, eval, llffhold=8):
     cam_infos = []
-    ply_path = os.path.join(path, "points3d.ply")
-    try:
-        pcd = fetchPly(ply_path)
-    except:
-        pcd = None
         
     #cameras
     cameras_file = os.path.join(path, "out.myxed")
@@ -274,7 +269,9 @@ def readMyxedInfo(path, images, eval, llffhold=8):
     with open(cameras_file, "r") as cfile:
         camera_data = json.loads(cfile.read())
 
-    reading_dir = "undistorted_images" if images == None else images
+    pointfilename = camera_data["processing"]["points"]
+    print(pointfilename)
+    reading_dir = camera_data["processing"]["images"]
     cam_infos_unsorted = readMyxedCameras(camera_data=camera_data, images_folder=os.path.join(path, reading_dir))
     cam_infos = sorted(cam_infos_unsorted.copy(), key = lambda x : x.image_name)
 
@@ -286,6 +283,13 @@ def readMyxedInfo(path, images, eval, llffhold=8):
         test_cam_infos = []
 
     nerf_normalization = getNerfppNorm(train_cam_infos)
+
+    ply_path = os.path.join(path, pointfilename)
+    try:
+        pcd = fetchPly(ply_path)
+    except:
+        pcd = None
+
 
     scene_info = SceneInfo(point_cloud=pcd,
                            train_cameras=train_cam_infos,
