@@ -47,7 +47,7 @@ def rot2rotmat(rot):
     #     [0, 1, 0],
     #     [0, 0, 1]
     # ])
-    r = R.from_euler('zyx', rot, degrees=True)
+    r = R.from_euler('xyz', rot, degrees=True)
     return r.as_matrix()
 
 def qvec2rotmat(qvec):

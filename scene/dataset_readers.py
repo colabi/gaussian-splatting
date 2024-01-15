@@ -80,7 +80,7 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
         intr = cam_intrinsics[extr.camera_id]
         height = intr.height
         width = intr.width
-
+        print("width: ", width, " focal: ", intr.params[0])
         uid = intr.id
         R = np.transpose(qvec2rotmat(extr.qvec))
         T = np.array(extr.tvec)
@@ -235,14 +235,12 @@ def readMyxedCameras(camera_data, images_folder):
     idx = 0
     for camera in cameras:
     # for idx, key in enumerate(cam_extrinsics):
-        if idx % skip == 0 and idx < 1000:
+        if idx % skip == 0:
             sys.stdout.write('\r')
             # the exact output you're looking for:
-            sys.stdout.write("Reading camera {}/{}".format(idx+1, len(cameras)))
-            sys.stdout.flush()
 
-            height = camera[8]
-            width = camera[9]
+            height = camera[9]
+            width = camera[8]
 
             uid = camera[0]
             pos = [camera[1], camera[2], camera[3]]
@@ -252,6 +250,8 @@ def readMyxedCameras(camera_data, images_folder):
 
             FovY = camera[7]["FOVY"]/KDEG2RAD
             FovX = float(width)/float(height)*FovY
+            sys.stdout.write("Reading camera {}/{} {},{} {}:{}".format(idx+1, len(cameras), FovX, FovY, width, height))
+            sys.stdout.flush()
 
             image_path = os.path.join(images_folder, os.path.basename(uid))
             image_name = os.path.basename(image_path).split(".")[0]
