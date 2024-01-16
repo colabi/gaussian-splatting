@@ -83,7 +83,7 @@ def readRCCamerasFile(filepath, configname, imagepath):
             if r[0][0] != "#":
                 print(r)
                 uid = getRename(r[0], -1)
-                ci = CameraInfo(uid, float(r[1]), float(r[2]), float(r[2]), float(r[4]), float(r[5]), float(r[6]), configinfo, width, height)
+                ci = CameraInfo(uid, float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5]), float(r[6]), configinfo, width, height)
                 lines.append(ci)
 
 
@@ -106,7 +106,10 @@ if __name__ == "__main__":
     configdata = {
         "cameras": camconfig,
         "processing": {
-            "skip": skip
+            "images": "undistorted_images",
+            "points": "capture.ply",
+            "skip": 5,
+            "pointstep": 10
         }
     }
     with open(outpath, "w") as outf:

@@ -22,6 +22,7 @@ from pathlib import Path
 from plyfile import PlyData, PlyElement
 from utils.sh_utils import SH2RGB
 from scene.gaussian_model import BasicPointCloud
+import quaternion
 
 KDEG2RAD = 57.2958279088
 
@@ -70,6 +71,7 @@ def getNerfppNorm(cam_info):
 
 def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
     cam_infos = []
+    f = open("/tmp/cameras.quat", "w")
     for idx, key in enumerate(cam_extrinsics):
         sys.stdout.write('\r')
         # the exact output you're looking for:
@@ -80,9 +82,10 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
         intr = cam_intrinsics[extr.camera_id]
         height = intr.height
         width = intr.width
-        print("width: ", width, " focal: ", intr.params[0])
+
         uid = intr.id
         R = np.transpose(qvec2rotmat(extr.qvec))
+        f.write("{} {} {} {} {} {} {} {}\n".format(extr.camera_id, extr.tvec[0], extr.tvec[1], extr.tvec[2], extr.qvec[0], extr.qvec[1], extr.qvec[2], extr.qvec[3]))
         T = np.array(extr.tvec)
 
         if intr.model=="SIMPLE_PINHOLE":
@@ -96,6 +99,7 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
             FovX = focal2fov(focal_length_x, width)
         else:
             assert False, "Colmap camera model not handled: only undistorted datasets (PINHOLE or SIMPLE_PINHOLE cameras) supported!"
+        print("width: ", width, " focal: ", intr.params[0], " FOVX ", FovX, " FOVY ", FovY)
 
         image_path = os.path.join(images_folder, os.path.basename(extr.name))
         image_name = os.path.basename(image_path).split(".")[0]
@@ -104,6 +108,7 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
         cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
                               image_path=image_path, image_name=image_name, width=width, height=height)
         cam_infos.append(cam_info)
+    f.close()
     sys.stdout.write('\n')
     return cam_infos
 
@@ -231,25 +236,35 @@ def readMyxedCameras(camera_data, images_folder):
     # cam_extrinsics = camera_data["extrinsics"]
     cameras = camera_data["cameras"]
     process = camera_data["processing"]
-    skip = process["skip"]
+    skip = process["step"]
     idx = 0
-    for camera in cameras:
+    for uid in cameras:
+        camera = cameras[uid]
     # for idx, key in enumerate(cam_extrinsics):
-        if idx % skip == 0:
+        if idx % skip == 0 and idx < 2000:
             sys.stdout.write('\r')
             # the exact output you're looking for:
 
-            height = camera[9]
-            width = camera[8]
+            height = camera[10]
+            width = camera[9]
 
-            uid = camera[0]
-            pos = [camera[1], camera[2], camera[3]]
-            rot = [camera[4], camera[5], camera[6]]
-            R = np.transpose(rot2rotmat(rot))
+            pos = [camera[0], camera[1], camera[2]]
+            rot = [camera[3], camera[4], camera[5]]
+            q = quaternion.from_rotation_vector(rot)
+            R = qvec2rotmat([q.w, q.x, q.y, q.z])
+            # R = rot2rotmat(rot)
+            # R[:3, 1:3] *= -1
+            # R = np.linalg.inv(R)
+            R = np.transpose(R)
+
+            # R = rot2rotmat(rot)
             T = np.array(pos)
 
-            FovY = camera[7]["FOVY"]/KDEG2RAD
-            FovX = float(width)/float(height)*FovY
+            # FovY = camera[7]["FOVY"]/KDEG2RAD
+            # FovX = float(width)/float(height)*FovY
+            FovY = 1.511575470195724
+            FovX = 1.8010934170294524
+
             sys.stdout.write("Reading camera {}/{} {},{} {}:{}".format(idx+1, len(cameras), FovX, FovY, width, height))
             sys.stdout.flush()
 
