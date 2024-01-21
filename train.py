@@ -78,8 +78,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         # Pick a random Camera
         if not viewpoint_stack:
             viewpoint_stack = scene.getTrainCameras().copy()
-        # viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack)-1))
-        viewpoint_cam = viewpoint_stack.pop(iteration % len(viewpoint_stack))
+        viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack)-1))
+        # viewpoint_cam = viewpoint_stack.pop(iteration % len(viewpoint_stack))
 
         # Render
         if (iteration - 1) == debug_from:
@@ -91,10 +91,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
 
         # Loss
-        # gt_image = viewpoint_cam.original_image.cuda()
-        gt_image = viewpoint_cam.load_image()
+        gt_image = viewpoint_cam.load_image_tensor().cuda()
         Ll1 = l1_loss(image, gt_image)
-        if iteration % 1000 == 0:
+        if iteration % 300 == 0:
             print("SAVE GTIMAGE")
             torch.save(image, "/working/recon/115886CF-AF45-4AEB-B1F4-DDF5CF588EF4/render.bin")
             torch.save(gt_image, "/working/recon/115886CF-AF45-4AEB-B1F4-DDF5CF588EF4/gt.bin")
@@ -169,35 +168,35 @@ def training_report(tb_writer, iteration, Ll1, loss, l1_loss, elapsed, testing_i
         tb_writer.add_scalar('iter_time', elapsed, iteration)
 
     # Report test and samples of training set
-    if iteration in testing_iterations:
-        torch.cuda.empty_cache()
-        validation_configs = ({'name': 'test', 'cameras' : scene.getTestCameras()}, 
-                              {'name': 'train', 'cameras' : [scene.getTrainCameras()[idx % len(scene.getTrainCameras())] for idx in range(5, 30, 5)]})
+    # if iteration in testing_iterations:
+    #     torch.cuda.empty_cache()
+    #     validation_configs = ({'name': 'test', 'cameras' : scene.getTestCameras()}, 
+    #                           {'name': 'train', 'cameras' : [scene.getTrainCameras()[idx % len(scene.getTrainCameras())] for idx in range(5, 30, 5)]})
 
-        for config in validation_configs:
-            if config['cameras'] and len(config['cameras']) > 0:
-                l1_test = 0.0
-                psnr_test = 0.0
-                for idx, viewpoint in enumerate(config['cameras']):
-                    image = torch.clamp(renderFunc(viewpoint, scene.gaussians, *renderArgs)["render"], 0.0, 1.0)
-                    gt_image = torch.clamp(viewpoint.original_image.to("cuda"), 0.0, 1.0)
-                    if tb_writer and (idx < 5):
-                        tb_writer.add_images(config['name'] + "_view_{}/render".format(viewpoint.image_name), image[None], global_step=iteration)
-                        if iteration == testing_iterations[0]:
-                            tb_writer.add_images(config['name'] + "_view_{}/ground_truth".format(viewpoint.image_name), gt_image[None], global_step=iteration)
-                    l1_test += l1_loss(image, gt_image).mean().double()
-                    psnr_test += psnr(image, gt_image).mean().double()
-                psnr_test /= len(config['cameras'])
-                l1_test /= len(config['cameras'])          
-                print("\n[ITER {}] Evaluating {}: L1 {} PSNR {}".format(iteration, config['name'], l1_test, psnr_test))
-                if tb_writer:
-                    tb_writer.add_scalar(config['name'] + '/loss_viewpoint - l1_loss', l1_test, iteration)
-                    tb_writer.add_scalar(config['name'] + '/loss_viewpoint - psnr', psnr_test, iteration)
+    #     for config in validation_configs:
+    #         if config['cameras'] and len(config['cameras']) > 0:
+    #             l1_test = 0.0
+    #             psnr_test = 0.0
+    #             for idx, viewpoint in enumerate(config['cameras']):
+    #                 image = torch.clamp(renderFunc(viewpoint, scene.gaussians, *renderArgs)["render"], 0.0, 1.0)
+    #                 gt_image = torch.clamp(viewpoint.original_image.to("cuda"), 0.0, 1.0)
+    #                 if tb_writer and (idx < 5):
+    #                     tb_writer.add_images(config['name'] + "_view_{}/render".format(viewpoint.image_name), image[None], global_step=iteration)
+    #                     if iteration == testing_iterations[0]:
+    #                         tb_writer.add_images(config['name'] + "_view_{}/ground_truth".format(viewpoint.image_name), gt_image[None], global_step=iteration)
+    #                 l1_test += l1_loss(image, gt_image).mean().double()
+    #                 psnr_test += psnr(image, gt_image).mean().double()
+    #             psnr_test /= len(config['cameras'])
+    #             l1_test /= len(config['cameras'])          
+    #             print("\n[ITER {}] Evaluating {}: L1 {} PSNR {}".format(iteration, config['name'], l1_test, psnr_test))
+    #             if tb_writer:
+    #                 tb_writer.add_scalar(config['name'] + '/loss_viewpoint - l1_loss', l1_test, iteration)
+    #                 tb_writer.add_scalar(config['name'] + '/loss_viewpoint - psnr', psnr_test, iteration)
 
-        if tb_writer:
-            tb_writer.add_histogram("scene/opacity_histogram", scene.gaussians.get_opacity, iteration)
-            tb_writer.add_scalar('total_points', scene.gaussians.get_xyz.shape[0], iteration)
-        torch.cuda.empty_cache()
+    #     if tb_writer:
+    #         tb_writer.add_histogram("scene/opacity_histogram", scene.gaussians.get_opacity, iteration)
+    #         tb_writer.add_scalar('total_points', scene.gaussians.get_xyz.shape[0], iteration)
+    #     torch.cuda.empty_cache()
 
 if __name__ == "__main__":
     # Set up command line argument parser

@@ -9,6 +9,7 @@
 # For inquiries contact  george.drettakis@inria.fr
 #
 
+import time
 import torch
 from torch import nn
 import numpy as np
@@ -91,11 +92,23 @@ class Camera(nn.Module):
         # self.full_proj_transform = torch.tensor(MVP).cuda()
 
         self.camera_center = self.world_view_transform.inverse()[3, :3]
-        # print("MV: ", self.world_view_transform, " MVP: ", self.full_proj_transform)
+
+        # self.load_image()
+
+    def load_image_tensor(self):
+        t = torch.load(self.image_path)
+        return t
 
     def load_image(self):
+        start = time.time()
         image = Image.open(self.image_path)
-        original_image = image.clamp(0.0, 1.0).to('cuda')
+        resized_image = torch.from_numpy(np.array(image)) / 255.0
+        resized_image = resized_image.permute(2, 0, 1)
+        resized_image = resized_image[:3, ...]
+        # print(resized_image.shape)
+        original_image = resized_image.clamp(0.0, 1.0).to('cuda')
+        end = time.time()
+        # print(end-start)
         return original_image
 
 class MiniCam:

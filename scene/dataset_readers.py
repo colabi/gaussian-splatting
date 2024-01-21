@@ -270,7 +270,7 @@ def readMyxedCameras(camera_data, images_folder):
             image_name = os.path.basename(image_path).split(".")[0]
             # image = Image.open(image_path)
             image = None
-            
+
             cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
                                 image_path=image_path, image_name=image_name, width=width, height=height)
             cam_infos.append(cam_info)
@@ -312,10 +312,10 @@ def readMyxedInfo(path, images, eval, llffhold=8):
     try:
         xyz, rgb, _ = read_points_myxed(ply_path, step=pointstep)
         pcd = BasicPointCloud(points=xyz, colors=rgb, normals=None)
+        print("lengths: ", len(pcd.points))
     except Exception as e:
         print("ERROR", e)
         pcd = None
-    print("lengths: ", len(pcd.points))
 
     scene_info = SceneInfo(point_cloud=pcd,
                            train_cameras=train_cam_infos,

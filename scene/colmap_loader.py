@@ -133,15 +133,29 @@ def read_points3D_text(path):
     return xyzs, rgbs, errors
 
 def read_points_myxed(path_to_model_file, step=1):
-    p = PlyData.read(path_to_model_file)
-    num_points = len(p['vertex'])
-    vertices = p['vertex']
+    if False:
+        p = PlyData.read(path_to_model_file)
+        print("POST READ")
+        num_points = len(p['vertex'])
+        vertices = p['vertex']
 
-    positions = np.vstack([vertices['x'], vertices['y'], vertices['z']]).T
-    colors = np.vstack([vertices['red'], vertices['green'], vertices['blue']]).T / 255.0
-    # if step > 1:
-    #     positions = positions[0::step]
-    #     colors = colors[0::step]
+        positions = np.vstack([vertices['x'], vertices['y'], vertices['z']]).T
+        colors = np.vstack([vertices['red'], vertices['green'], vertices['blue']]).T / 255.0
+    else:
+        ppath = path_to_model_file.replace("capture.ply","positions.bin")
+        print("pospath: ", ppath)
+        positions = np.fromfile(ppath, dtype=np.float32)
+        lpos = int(positions.shape[0]/3)
+        positions = positions.reshape((lpos, 3))
+        
+        cpath = path_to_model_file.replace("capture.ply","colors.bin")
+        colors = np.fromfile(cpath, dtype=np.float32)
+        colors = colors.reshape((lpos, 3))
+
+
+    if step > 1:
+        positions = positions[0::step]
+        colors = colors[0::step]
     print("read_points_myxed: ", positions.shape)
     return positions, colors, None
 
