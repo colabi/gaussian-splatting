@@ -13,6 +13,7 @@ import os
 import sys
 from PIL import Image
 from typing import NamedTuple
+from scipy.spatial.transform import Rotation as Rot
 from scene.colmap_loader import read_extrinsics_text, read_intrinsics_text, qvec2rotmat, rot2rotmat, \
     read_extrinsics_binary, read_intrinsics_binary, read_points3D_binary, read_points3D_text, read_points_myxed
 from utils.graphics_utils import getWorld2View2, focal2fov, fov2focal
@@ -84,7 +85,8 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
         width = intr.width
 
         uid = intr.id
-        R = np.transpose(qvec2rotmat(extr.qvec))
+        R = qvec2rotmat(extr.qvec) 
+        R = np.transpose(R)
         f.write("{} {} {} {} {} {} {} {}\n".format(extr.camera_id, extr.tvec[0], extr.tvec[1], extr.tvec[2], extr.qvec[0], extr.qvec[1], extr.qvec[2], extr.qvec[3]))
         T = np.array(extr.tvec)
 
@@ -106,7 +108,7 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
         image = Image.open(image_path)
 
         cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
-                              image_path=image_path, image_name=image_name, width=width, height=height)
+                            image_path=image_path, image_name=image_name, width=width, height=height)
         cam_infos.append(cam_info)
     f.close()
     sys.stdout.write('\n')
@@ -119,8 +121,7 @@ def fetchPly(path):
     vertices = plydata['vertex']
     positions = np.vstack([vertices['x'], vertices['y'], vertices['z']]).T
     colors = np.vstack([vertices['red'], vertices['green'], vertices['blue']]).T / 255.0
-    print(len(colors))
-    # normals = np.vstack([vertices['nx'], vertices['ny'], vertices['nz']]).T
+    normals = np.vstack([vertices['nx'], vertices['ny'], vertices['nz']]).T
     return BasicPointCloud(points=positions, colors=colors, normals=normals)
 
 def storePly(path, xyz, rgb):
@@ -173,6 +174,7 @@ def readColmapSceneInfo(path, images, eval, llffhold=8):
         try:
             xyz, rgb, _ = read_points3D_binary(bin_path)
         except:
+            print("some error")
             xyz, rgb, _ = read_points3D_text(txt_path)
         storePly(ply_path, xyz, rgb)
     try:
@@ -242,22 +244,18 @@ def readMyxedCameras(camera_data, images_folder):
         camera = cameras[uid]
     # for idx, key in enumerate(cam_extrinsics):
         if idx % skip == 0 and idx < 2000:
+            # print("Camera ID: ", uid)
             sys.stdout.write('\r')
             # the exact output you're looking for:
 
-            height = camera[10]
-            width = camera[9]
+            width = camera[21]
+            height = camera[22]
 
-            pos = [camera[0], camera[1], camera[2]]
-            rot = [camera[3], camera[4], camera[5]]
-            q = quaternion.from_rotation_vector(rot)
-            R = qvec2rotmat([q.w, q.x, q.y, q.z])
-            # R = rot2rotmat(rot)
-            # R[:3, 1:3] *= -1
-            # R = np.linalg.inv(R)
-            R = np.transpose(R)
-
-            # R = rot2rotmat(rot)
+            pos = [camera[0], camera[1], camera[2]] #remember y and z should be negated
+            
+            m = Rot.from_euler('xyz', [camera[15], camera[16], camera[17]], degrees=True)
+            R = m.as_matrix()
+            # R = np.transpose(R)
             T = np.array(pos)
 
             # FovY = camera[7]["FOVY"]/KDEG2RAD
@@ -265,13 +263,14 @@ def readMyxedCameras(camera_data, images_folder):
             FovY = 1.511575470195724
             FovX = 1.8010934170294524
 
-            sys.stdout.write("Reading camera {}/{} {},{} {}:{}".format(idx+1, len(cameras), FovX, FovY, width, height))
+            sys.stdout.write("Reading camera {}/{} {},{} {}:{}".format(idx+1, len(cameras), camera[0], camera[15], width, height))
             sys.stdout.flush()
 
             image_path = os.path.join(images_folder, os.path.basename(uid))
             image_name = os.path.basename(image_path).split(".")[0]
-            image = Image.open(image_path)
-
+            # image = Image.open(image_path)
+            image = None
+            
             cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
                                 image_path=image_path, image_name=image_name, width=width, height=height)
             cam_infos.append(cam_info)
@@ -307,6 +306,7 @@ def readMyxedInfo(path, images, eval, llffhold=8):
 
     nerf_normalization = getNerfppNorm(train_cam_infos)
 
+    pcd = None
     ply_path = os.path.join(basepath, pointfilename)
     print("BIN:", ply_path)
     try:

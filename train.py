@@ -29,6 +29,9 @@ except ImportError:
     TENSORBOARD_FOUND = False
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
+    import torchvision
+    from torchvision import transforms
+    tpi = transforms.ToPILImage
     first_iter = 0
     tb_writer = prepare_output_and_logger(dataset)
     gaussians = GaussianModel(dataset.sh_degree)
@@ -75,7 +78,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         # Pick a random Camera
         if not viewpoint_stack:
             viewpoint_stack = scene.getTrainCameras().copy()
-        viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack)-1))
+        # viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack)-1))
+        viewpoint_cam = viewpoint_stack.pop(iteration % len(viewpoint_stack))
 
         # Render
         if (iteration - 1) == debug_from:
@@ -87,8 +91,13 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
 
         # Loss
-        gt_image = viewpoint_cam.original_image.cuda()
+        # gt_image = viewpoint_cam.original_image.cuda()
+        gt_image = viewpoint_cam.load_image()
         Ll1 = l1_loss(image, gt_image)
+        if iteration % 1000 == 0:
+            print("SAVE GTIMAGE")
+            torch.save(image, "/working/recon/115886CF-AF45-4AEB-B1F4-DDF5CF588EF4/render.bin")
+            torch.save(gt_image, "/working/recon/115886CF-AF45-4AEB-B1F4-DDF5CF588EF4/gt.bin")
         loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(image, gt_image))
         loss.backward()
 
