@@ -8,7 +8,7 @@
 #
 # For inquiries contact  george.drettakis@inria.fr
 #
-
+import time
 import os
 import torch
 from random import randint
@@ -51,6 +51,14 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     ema_loss_for_log = 0.0
     progress_bar = tqdm(range(first_iter, opt.iterations), desc="Training progress")
     first_iter += 1
+    elapsed_render_time = 0
+    elapsed_learn_back_time = 0
+    elapsed_learn_step_time = 0
+    elapsed_log_time = 0
+    elapsed_image_load_time = 0
+    elapsed_image_time = 0
+    elapsed_densification_time = 0
+    elapsed_progress_time = 0
     for iteration in range(first_iter, opt.iterations + 1):        
         # if network_gui.conn == None:
         #     network_gui.try_connect()
@@ -85,39 +93,67 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         if (iteration - 1) == debug_from:
             pipe.debug = True
 
+        start = time.time()
         bg = torch.rand((3), device="cuda") if opt.random_background else background
 
         render_pkg = render(viewpoint_cam, gaussians, pipe, bg)
         image, viewspace_point_tensor, visibility_filter, radii = render_pkg["render"], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
+        end = time.time()
+        elapsed_render_time += (end - start)
 
         # Loss
+        start = time.time()
         gt_image = viewpoint_cam.load_image_tensor().cuda()
+        end = time.time()
+        elapsed_image_load_time += (end - start)
+
+        start = time.time()
         Ll1 = l1_loss(image, gt_image)
+        loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(image, gt_image))
+        end = time.time()
+        elapsed_image_time += (end - start)
+
         if iteration % 300 == 0:
             print("SAVE GTIMAGE")
             torch.save(image, "/working/recon/115886CF-AF45-4AEB-B1F4-DDF5CF588EF4/render.bin")
             torch.save(gt_image, "/working/recon/115886CF-AF45-4AEB-B1F4-DDF5CF588EF4/gt.bin")
-        loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(image, gt_image))
+            print("render: ", elapsed_render_time/60.0, "\nlearn back: ", elapsed_learn_back_time/60.0, 
+            "\nlearn opt: ", elapsed_learn_step_time/60.0, 
+            "\ndense: ", elapsed_densification_time/60.0, "\nimageloss: ", elapsed_image_time/60.0,
+            "\nimgload: ", elapsed_image_load_time/60.0)
+
+
+        start = time.time()
         loss.backward()
+        end = time.time()
+        elapsed_learn_back_time += (end - start)
 
         iter_end.record()
 
         with torch.no_grad():
             # Progress bar
-            ema_loss_for_log = 0.4 * loss.item() + 0.6 * ema_loss_for_log
+            start = time.time()
+            i = loss.item()
+            ema_loss_for_log = 0.4 * i + 0.6 * ema_loss_for_log
             if iteration % 10 == 0:
                 progress_bar.set_postfix({"Loss": f"{ema_loss_for_log:.{7}f}"})
                 progress_bar.update(10)
             if iteration == opt.iterations:
                 progress_bar.close()
+            end = time.time()
+            elapsed_progress_time += (end - start)
 
             # Log and save
+            start = time.time()
             training_report(tb_writer, iteration, Ll1, loss, l1_loss, iter_start.elapsed_time(iter_end), testing_iterations, scene, render, (pipe, background))
             if (iteration in saving_iterations):
                 print("\n[ITER {}] Saving Gaussians".format(iteration))
                 scene.save(iteration)
+            end = time.time()
+            elapsed_log_time += (end - start)
 
             # Densification
+            start = time.time()
             if iteration < opt.densify_until_iter:
                 # Keep track of max radii in image-space for pruning
                 gaussians.max_radii2D[visibility_filter] = torch.max(gaussians.max_radii2D[visibility_filter], radii[visibility_filter])
@@ -129,7 +165,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 
                 if iteration % opt.opacity_reset_interval == 0 or (dataset.white_background and iteration == opt.densify_from_iter):
                     gaussians.reset_opacity()
+            end = time.time()
+            elapsed_densification_time += (end - start)
 
+            start = time.time()
             # Optimizer step
             if iteration < opt.iterations:
                 gaussians.optimizer.step()
@@ -138,6 +177,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             if (iteration in checkpoint_iterations):
                 print("\n[ITER {}] Saving Checkpoint".format(iteration))
                 torch.save((gaussians.capture(), iteration), scene.model_path + "/chkpnt" + str(iteration) + ".pth")
+            end = time.time()
+            elapsed_learn_step_time += (end - start)
 
 def prepare_output_and_logger(args):    
     if not args.model_path:
